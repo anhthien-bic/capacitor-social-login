@@ -51,18 +51,41 @@ export class SocialLoginWeb extends WebPlugin implements SocialLoginPlugin {
         }
       });
     }
+    
+    // if (localStorage.getItem(SocialLoginWeb.OAUTH_STATE_KEY_X)) {
+    //   console.log('OAUTH_STATE_KEY_X found');
+    //   this.handleXOAuthRedirectX().then((result) => {
+    //     if (result) {
+    //       window.opener?.postMessage(
+    //         {
+    //           type: 'oauth-response',
+    //           ...result.result,
+    //         },
+    //         window.location.origin,
+    //       );
+    //       window.close();
+    //     }
+    //   });
+    // }
   }
 
   private async handleOAuthRedirect() {
     const url = new URL(window.location.href);
     const googleResult = this.googleProvider.handleOAuthRedirect(url);
     if (googleResult) return googleResult;
-    
     const xResult = await this.xProvider.handleOAuthRedirect(url);
     if (xResult) return xResult;
     
     return null;
   }
+
+  // private async handleXOAuthRedirectX() {
+  //   const url = new URL(window.location.href);
+  //   const xResult = await this.xProvider.handleOAuthRedirect(url);
+  //   if (xResult) return xResult;
+    
+  //   return null;
+  // }
 
   async initialize(options: InitializeOptions): Promise<void> {
     const initPromises: Promise<void>[] = [];

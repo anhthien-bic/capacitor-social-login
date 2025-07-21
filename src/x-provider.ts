@@ -110,87 +110,94 @@ export class XSocialLogin extends BaseSocialLogin {
     }
 
     if (code && state) {
-      // This is the authorization code from PKCE flow
-      // We need to exchange it for access token
-      return await this.exchangeCodeForToken(code, state);
+      // Because of CORS issue: https://devcommunity.x.com/t/cors-error-in-oauth2-token/163898/21
+      // Backend will exchange the code for access token
+      localStorage.removeItem(BaseSocialLogin.OAUTH_STATE_KEY);
+      return {
+        provider: 'x',
+        result: {
+          token: code || '',
+          code_verifier: this.getCodeVerifier() || '',
+        },
+      };
     }
 
     return null;
   }
 
-  private async exchangeCodeForToken(code: string, _state: string): Promise<LoginResult | null> {
-    const codeVerifier = this.getCodeVerifier();
-    if (!codeVerifier) {
-      console.error('No code verifier found');
-      return null;
-    }
+//   private async exchangeCodeForToken(code: string, clientId: string): Promise<LoginResult | null> {
+//     const codeVerifier = this.getCodeVerifier();
+//     if (!codeVerifier) {
+//       console.error('No code verifier found');
+//       return null;
+//     }
 
-    try {
-      const tokenResponse = await fetch('https://api.x.com/2/oauth2/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          client_id: this.clientId!,
-          code_verifier: codeVerifier,
-          code: code,
-          redirect_uri: this.redirectUrl || window.location.origin + window.location.pathname,
-        }),
-      });
+//     try {
+//       const tokenResponse = await fetch('https://api.x.com/2/oauth2/token', {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/x-www-form-urlencoded',
+//         },
+//         body: new URLSearchParams({
+//           grant_type: 'authorization_code',
+//           client_id: clientId,
+//           code_verifier: codeVerifier,
+//           code: code,
+//           redirect_uri: this.redirectUrl || window.location.origin + window.location.pathname,
+//         }),
+//       });
 
-      if (!tokenResponse.ok) {
-        console.error('Failed to exchange code for token:', await tokenResponse.text());
-        return null;
-      }
+//       if (!tokenResponse.ok) {
+//         console.error('Failed to exchange code for token:', await tokenResponse.text());
+//         return null;
+//       }
 
-      const tokenData = await tokenResponse.json();
-      const { access_token, refresh_token } = tokenData;
+//       const tokenData = await tokenResponse.json();
+//       const { access_token } = tokenData;
 
-      // Get user profile
-      const profileResponse = await fetch('https://api.x.com/2/users/me', {
-        headers: {
-          'Authorization': `Bearer ${access_token}`,
-        },
-      });
+//       // Get user profile
+//       const profileResponse = await fetch('https://api.x.com/2/users/me', {
+//         headers: {
+//           'Authorization': `Bearer ${access_token}`,
+//         },
+//       });
 
-      if (!profileResponse.ok) {
-        console.error('Failed to get user profile:', await profileResponse.text());
-        return null;
-      }
+//       if (!profileResponse.ok) {
+//         console.error('Failed to get user profile:', await profileResponse.text());
+//         return null;
+//       }
 
-      const profileData = await profileResponse.json();
-      const profile = profileData.data;
+//       const profileData = await profileResponse.json();
+//       const profile = profileData.data;
 
-      // Store state
-      this.persistStateX(access_token, refresh_token);
+//       // Store state
+//     //   this.persistStateX(access_token, refresh_token);
 
-      // Clear code verifier
-      this.clearCodeVerifier();
+//       // Clear code verifier
+//       this.clearCodeVerifier();
+//     //   return null;
 
-      return {
-        provider: 'x',
-        result: {
-          accessToken: {
-            token: access_token,
-            refreshToken: refresh_token,
-          },
-          profile: {
-            id: profile.id || null,
-            username: profile.username || null,
-            name: profile.name || null,
-            email: profile.email || null,
-            profileImageUrl: profile.profile_image_url || null,
-            verified: profile.verified || null,
-          },
-        },
-      };
-    } catch (error) {
-      console.error('Error exchanging code for token:', error);
-      return null;
-    }
-  }
+//       return {
+//         provider: 'x',
+//         result: {
+//           accessToken: {
+//             token: access_token,
+//           },
+//           profile: {
+//             id: profile.id || null,
+//             username: profile.username || null,
+//             name: profile.name || null,
+//             email: profile.email || null,
+//             profileImageUrl: profile.profile_image_url || null,
+//             verified: profile.verified || null,
+//           },
+//         },
+//       };
+//     } catch (error) {
+//       console.error('Error exchanging code for token:', error);
+//       return null;
+//     }
+//   }
 
   private generateCodeVerifier(): string {
     const array = new Uint8Array(32);
@@ -254,12 +261,12 @@ export class XSocialLogin extends BaseSocialLogin {
           clearInterval(popupClosedInterval);
 
           const result = event.data;
-          if (result.accessToken && result.profile) {
+          if (result.token && result.code_verifier) {
             resolve({
               provider: 'x' as T,
               result: {
-                accessToken: result.accessToken,
-                profile: result.profile,
+                token: result.token,
+                code_verifier: result.code_verifier,
               },
             });
           } else {
@@ -287,13 +294,13 @@ export class XSocialLogin extends BaseSocialLogin {
     });
   }
 
-  private persistStateX(accessToken: string, refreshToken?: string) {
-    try {
-      window.localStorage.setItem(this.X_STATE_KEY, JSON.stringify({ accessToken, refreshToken }));
-    } catch (e) {
-      console.error('Cannot persist state X', e);
-    }
-  }
+//   private persistStateX(accessToken: string, refreshToken?: string) {
+//     try {
+//       window.localStorage.setItem(this.X_STATE_KEY, JSON.stringify({ accessToken, refreshToken }));
+//     } catch (e) {
+//       console.error('Cannot persist state X', e);
+//     }
+//   }
 
   private clearStateX() {
     try {

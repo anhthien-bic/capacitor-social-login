@@ -532,10 +532,10 @@ Execute provider-specific calls
 
 #### XLoginResponse
 
-| Prop              | Type                                                                                                                                                                    |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`accessToken`** | <code><a href="#accesstoken">AccessToken</a> \| null</code>                                                                                                             |
-| **`profile`**     | <code>{ id: string \| null; username: string \| null; name: string \| null; email: string \| null; profileImageUrl: string \| null; verified: boolean \| null; }</code> |
+| Prop                | Type                |
+| ------------------- | ------------------- |
+| **`token`**         | <code>string</code> |
+| **`code_verifier`** | <code>string</code> |
 
 
 #### FacebookLoginOptions

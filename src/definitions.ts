@@ -194,15 +194,8 @@ export interface AppleProviderResponse {
 }
 
 export interface XLoginResponse {
-  accessToken: AccessToken | null;
-  profile: {
-    id: string | null;
-    username: string | null;
-    name: string | null;
-    email: string | null;
-    profileImageUrl: string | null;
-    verified: boolean | null;
-  };
+  token: string;
+  code_verifier: string;
 }
 
 export type LoginOptions =
