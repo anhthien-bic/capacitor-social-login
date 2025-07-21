@@ -62,6 +62,16 @@ export interface InitializeOptions {
      */
     redirectUrl?: string;
   };
+  x?: {
+    /**
+     * X (Twitter) Client ID, provided by X Developer Portal
+     */
+    clientId: string;
+    /**
+     * X (Twitter) Redirect URL, should be your backend url that is configured in your X app
+     */
+    redirectUrl?: string;
+  };
 }
 
 export interface FacebookLoginOptions {
@@ -116,6 +126,21 @@ export interface GoogleLoginOptions {
   style?: 'bottom' | 'standard';
 }
 
+export interface XLoginOptions {
+  /**
+   * Specifies the scopes required for accessing X APIs
+   * The default is defined in the configuration.
+   * @example ["tweet.read", "users.read"]
+   * @see [X OAuth2 Scopes](https://docs.x.com/resources/fundamentals/authentication/oauth-2-0/authorization-code)
+   */
+  scopes?: string[];
+  /**
+   * State parameter for CSRF protection
+   * @description state parameter for CSRF protection
+   */
+  state?: string;
+}
+
 export interface GoogleLoginResponseOnline {
   accessToken: AccessToken | null;
   idToken: string | null;
@@ -168,6 +193,18 @@ export interface AppleProviderResponse {
   };
 }
 
+export interface XLoginResponse {
+  accessToken: AccessToken | null;
+  profile: {
+    id: string | null;
+    username: string | null;
+    name: string | null;
+    email: string | null;
+    profileImageUrl: string | null;
+    verified: boolean | null;
+  };
+}
+
 export type LoginOptions =
   | {
       provider: 'facebook';
@@ -180,6 +217,10 @@ export type LoginOptions =
   | {
       provider: 'apple';
       options: AppleProviderOptions;
+    }
+  | {
+      provider: 'x';
+      options: XLoginOptions;
     };
 
 export type LoginResult =
@@ -194,6 +235,10 @@ export type LoginResult =
   | {
       provider: 'apple';
       result: AppleProviderResponse;
+    }
+  | {
+      provider: 'x';
+      result: XLoginResponse;
     };
 
 export interface AccessToken {
@@ -244,7 +289,7 @@ export interface AuthorizationCodeOptions {
    * Provider
    * @description Provider for the authorization code
    */
-  provider: 'apple' | 'google' | 'facebook';
+  provider: 'apple' | 'google' | 'facebook' | 'x';
 }
 
 export interface isLoggedInOptions {
@@ -252,7 +297,7 @@ export interface isLoggedInOptions {
    * Provider
    * @description Provider for the isLoggedIn
    */
-  provider: 'apple' | 'google' | 'facebook';
+  provider: 'apple' | 'google' | 'facebook' | 'x';
 }
 
 // Define the provider-specific call types
@@ -314,6 +359,7 @@ export type ProviderResponseMap = {
   facebook: FacebookLoginResponse;
   google: GoogleLoginResponse;
   apple: AppleProviderResponse;
+  x: XLoginResponse;
 };
 
 export interface SocialLoginPlugin {
@@ -333,7 +379,7 @@ export interface SocialLoginPlugin {
    * Logout
    * @description logout the user
    */
-  logout(options: { provider: 'apple' | 'google' | 'facebook' }): Promise<void>;
+  logout(options: { provider: 'apple' | 'google' | 'facebook' | 'x' }): Promise<void>;
   /**
    * IsLoggedIn
    * @description logout the user

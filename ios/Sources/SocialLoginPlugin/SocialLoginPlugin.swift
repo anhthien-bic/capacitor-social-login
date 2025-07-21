@@ -22,6 +22,7 @@ public class SocialLoginPlugin: CAPPlugin, CAPBridgedPlugin {
     private let apple = AppleProvider()
     private let facebook = FacebookProvider()
     private let google = GoogleProvider()
+    private let x = XProvider()
 
     @objc func initialize(_ call: CAPPluginCall) {
         var initialized = false
@@ -68,6 +69,14 @@ public class SocialLoginPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         }
 
+        if let xSettings = call.getObject("x") {
+            if let clientId = xSettings["clientId"] as? String,
+               let redirectUrl = xSettings["redirectUrl"] as? String {
+                x.initialize(clientId: clientId, redirectUrl: redirectUrl)
+                initialized = true
+            }
+        }
+
         if initialized {
             call.resolve()
         } else {
@@ -101,6 +110,13 @@ public class SocialLoginPlugin: CAPPlugin, CAPBridgedPlugin {
                 } catch {
                     call.reject(error.localizedDescription)
                 }
+            }
+        }
+        case "x": do {
+            if let accessToken = x.getAuthorizationCode() {
+                call.resolve([ "accessToken": accessToken ])
+            } else {
+                call.reject("No X authorization code available")
             }
         }
         default:
@@ -138,7 +154,9 @@ public class SocialLoginPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         case "facebook": do {
             call.resolve([ "isLoggedIn": self.facebook.isLoggedIn() ])
-
+        }
+        case "x": do {
+            call.resolve([ "isLoggedIn": self.x.isLoggedIn() ])
         }
         default:
             call.reject("Invalid provider")
@@ -163,6 +181,10 @@ public class SocialLoginPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         case "apple":
             apple.login(payload: payload) { (result: Result<AppleProviderResponse, Error>) in
+                self.handleLoginResult(result, call: call)
+            }
+        case "x":
+            x.login(payload: payload) { (result: Result<XLoginResponse, Error>) in
                 self.handleLoginResult(result, call: call)
             }
         default:
@@ -227,6 +249,9 @@ public class SocialLoginPlugin: CAPPlugin, CAPBridgedPlugin {
             apple.logout { result in
                 self.handleLogoutResult(result, call: call)
             }
+        case "x":
+            x.logout()
+            call.resolve()
         default:
             call.reject("Invalid provider")
         }
@@ -251,7 +276,8 @@ public class SocialLoginPlugin: CAPPlugin, CAPBridgedPlugin {
             apple.refresh { result in
                 self.handleRefreshResult(result, call: call)
             }
-
+        case "x":
+            call.reject("Refresh not implemented for X provider")
         default:
             call.reject("Invalid provider")
         }
@@ -374,6 +400,15 @@ public class SocialLoginPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve([
                     "provider": "facebook",
                     "result": facebookResult
+                ])
+            } else if let xResponse = response as? XLoginResponse {
+                let xResult: [String: Any] = [
+                    "accessToken": xResponse.accessToken,
+                    "profile": xResponse.profile
+                ]
+                call.resolve([
+                    "provider": "x",
+                    "result": xResult
                 ])
             } else {
                 call.reject("Unsupported provider response")

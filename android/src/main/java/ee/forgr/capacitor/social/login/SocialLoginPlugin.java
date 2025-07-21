@@ -102,6 +102,23 @@ public class SocialLoginPlugin extends Plugin {
             }
         }
 
+        JSObject x = call.getObject("x");
+        if (x != null) {
+            String xClientId = x.getString("clientId");
+            String xRedirectUrl = x.getString("redirectUrl");
+            if (xClientId == null || xClientId.isEmpty()) {
+                call.reject("x.clientId is null or empty");
+                return;
+            }
+            if (xRedirectUrl == null || xRedirectUrl.isEmpty()) {
+                call.reject("x.redirectUrl is null or empty");
+                return;
+            }
+            XProvider xProvider = new XProvider(this.getActivity(), this.getContext());
+            xProvider.initialize(xClientId, xRedirectUrl);
+            this.socialProviderHashMap.put("x", xProvider);
+        }
+
         call.resolve();
     }
 
