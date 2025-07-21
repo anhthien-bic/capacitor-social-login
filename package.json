@@ -1,5 +1,5 @@
 {
-  "name": "@capgo/capacitor-social-login",
+  "name": "@thienna/capacitor-social-login",
   "version": "7.8.3",
   "description": "All social logins in one plugin",
   "main": "dist/plugin.cjs.js",
@@ -89,5 +89,9 @@
     "android": {
       "src": "android"
     }
+  },
+  "private": false,
+  "publishConfig": {
+    "access": "public"
   }
 }
