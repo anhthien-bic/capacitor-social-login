@@ -27,9 +27,6 @@ import java.util.concurrent.CompletableFuture;
 public class XProvider implements SocialProvider {
     private static final String TAG = "XProvider";
     private static final String OAUTH_URL = "https://x.com/i/oauth2/authorize";
-    private static final String TOKEN_URL = "https://api.x.com/2/oauth2/token";
-    private static final String USER_PROFILE_URL = "https://api.x.com/2/users/me";
-    private static final int CUSTOM_TAB_REQUEST_CODE = 1001;
     
     private Activity activity;
     private Context context;
@@ -48,7 +45,6 @@ public class XProvider implements SocialProvider {
     public void initialize(String clientId, String redirectUrl) {
         this.clientId = clientId;
         this.redirectUrl = redirectUrl;
-        // loadStoredTokens();
     }
     
     @Override

@@ -8,8 +8,6 @@ import Security
 public class XProvider: NSObject {
     private static let TAG = "XProvider"
     private static let OAUTH_URL = "https://x.com/i/oauth2/authorize"
-    private static let TOKEN_URL = "https://api.x.com/2/oauth2/token"
-    private static let USER_PROFILE_URL = "https://api.x.com/2/users/me"
     
     private var clientId: String?
     private var redirectUrl: String?
@@ -20,7 +18,6 @@ public class XProvider: NSObject {
    func initialize(clientId: String, redirectUrl: String) {
         self.clientId = clientId
         self.redirectUrl = redirectUrl
-        loadStoredTokens()
     }
     
    func login(payload: [String: Any], completion: @escaping (Result<XLoginResponse, Error>) -> Void) {
@@ -45,7 +42,7 @@ public class XProvider: NSObject {
         startAuthenticationSession(authUrl: authUrl, redirectUrl: redirectUrl) { [weak self] result in
             switch result {
             case .success(let code):
-                self?.exchangeCodeForToken(code: code, completion: completion)
+                self?.handleOAuthSuccess(code: code, completion: completion)
             case .failure(let error):
                 completion(.failure(error))
             }
@@ -53,17 +50,16 @@ public class XProvider: NSObject {
     }
     
    func logout() {
-        clearStoredTokens()
-        accessToken = nil
-        refreshToken = nil
+        // Clear code verifier if any
+        clearCodeVerifier()
     }
     
    func getAuthorizationCode() -> String? {
-        return accessToken
+        return nil // Not implemented for X provider - use login instead
     }
     
    func isLoggedIn() -> Bool {
-        return accessToken != nil && !accessToken!.isEmpty
+        return false // For X provider, we don't store tokens locally - backend should handle validation
     }
     
     private func generateCodeVerifier() -> String {
@@ -148,104 +144,24 @@ public class XProvider: NSObject {
         webAuthSession?.start()
     }
     
-    private func exchangeCodeForToken(code: String, completion: @escaping (Result<XLoginResponse, Error>) -> Void) {
+    private func handleOAuthSuccess(code: String, completion: @escaping (Result<XLoginResponse, Error>) -> Void) {
         guard let codeVerifier = getStoredCodeVerifier() else {
             completion(.failure(XProviderError.noCodeVerifier))
             return
         }
         
-        var request = URLRequest(url: URL(string: XProvider.TOKEN_URL)!)
-        request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        // Clear code verifier
+        clearCodeVerifier()
         
-        let body = "grant_type=authorization_code" +
-            "&client_id=\(clientId!.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)" +
-            "&code_verifier=\(codeVerifier.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)" +
-            "&code=\(code.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)" +
-            "&redirect_uri=\(redirectUrl!.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)"
+        // Return code and code_verifier for backend to exchange
+        let response = XLoginResponse(
+            accessToken: ["token": code, "code_verifier": codeVerifier],
+            profile: [:]
+        )
         
-        request.httpBody = body.data(using: .utf8)
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            
-            guard let data = data else {
-                completion(.failure(XProviderError.noData))
-                return
-            }
-            
-            do {
-                let tokenResponse = try JSONSerialization.jsonObject(with: data) as! [String: Any]
-                let accessToken = tokenResponse["access_token"] as! String
-                let refreshToken = tokenResponse["refresh_token"] as? String
-                
-                // Get user profile
-                self?.getUserProfile(accessToken: accessToken, refreshToken: refreshToken, completion: completion)
-                
-            } catch {
-                completion(.failure(error))
-            }
-        }.resume()
+        completion(.success(response))
     }
-    
-    private func getUserProfile(accessToken: String, refreshToken: String?, completion: @escaping (Result<XLoginResponse, Error>) -> Void) {
-        var request = URLRequest(url: URL(string: XProvider.USER_PROFILE_URL)!)
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            
-            guard let data = data else {
-                completion(.failure(XProviderError.noData))
-                return
-            }
-            
-            do {
-                let profileResponse = try JSONSerialization.jsonObject(with: data) as! [String: Any]
-                let profile = profileResponse["data"] as! [String: Any]
-                
-                // Store tokens
-                self?.accessToken = accessToken
-                self?.refreshToken = refreshToken
-                self?.storeTokens(accessToken: accessToken, refreshToken: refreshToken)
-                
-                // Clear code verifier
-                self?.clearCodeVerifier()
-                
-                // Create response
-                let accessTokenObj: [String: Any] = [
-                    "token": accessToken,
-                    "refreshToken": refreshToken ?? ""
-                ]
-                
-                let profileObj: [String: Any] = [
-                    "id": profile["id"] as? String ?? "",
-                    "username": profile["username"] as? String ?? "",
-                    "name": profile["name"] as? String ?? "",
-                    "email": profile["email"] as? String ?? "",
-                    "profileImageUrl": profile["profile_image_url"] as? String ?? "",
-                    "verified": profile["verified"] as? Bool ?? false
-                ]
-                
-                let response = XLoginResponse(
-                    accessToken: accessTokenObj,
-                    profile: profileObj
-                )
-                
-                completion(.success(response))
-                
-            } catch {
-                completion(.failure(error))
-            }
-        }.resume()
-    }
-    
+
     private func storeCodeVerifier(_ codeVerifier: String) {
         UserDefaults.standard.set(codeVerifier, forKey: "XProvider_code_verifier")
     }
@@ -256,23 +172,6 @@ public class XProvider: NSObject {
     
     private func clearCodeVerifier() {
         UserDefaults.standard.removeObject(forKey: "XProvider_code_verifier")
-    }
-    
-    private func storeTokens(accessToken: String, refreshToken: String?) {
-        UserDefaults.standard.set(accessToken, forKey: "XProvider_access_token")
-        if let refreshToken = refreshToken {
-            UserDefaults.standard.set(refreshToken, forKey: "XProvider_refresh_token")
-        }
-    }
-    
-    private func clearStoredTokens() {
-        UserDefaults.standard.removeObject(forKey: "XProvider_access_token")
-        UserDefaults.standard.removeObject(forKey: "XProvider_refresh_token")
-    }
-    
-    private func loadStoredTokens() {
-        accessToken = UserDefaults.standard.string(forKey: "XProvider_access_token")
-        refreshToken = UserDefaults.standard.string(forKey: "XProvider_refresh_token")
     }
 }
 

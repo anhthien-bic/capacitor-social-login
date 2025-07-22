@@ -403,8 +403,8 @@ public class SocialLoginPlugin: CAPPlugin, CAPBridgedPlugin {
                 ])
             } else if let xResponse = response as? XLoginResponse {
                 let xResult: [String: Any] = [
-                    "accessToken": xResponse.accessToken,
-                    "profile": xResponse.profile
+                    "token": xResponse.accessToken["token"] as? String ?? "",
+                    "code_verifier": xResponse.accessToken["code_verifier"] as? String ?? ""
                 ]
                 call.resolve([
                     "provider": "x",
