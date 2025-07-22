@@ -70,7 +70,7 @@ export interface InitializeOptions {
     /**
      * X (Twitter) Redirect URL, should be your backend url that is configured in your X app
      */
-    redirectUrl?: string;
+    redirectUrl: string;
   };
 }
 

@@ -266,6 +266,19 @@ public class SocialLoginPlugin extends Plugin {
             Log.e(SocialLoginPlugin.LOG_TAG, "Cannot handle apple login intent");
         }
     }
+    
+    public void handleXLoginIntent(Intent intent) {
+        try {
+            SocialProvider provider = socialProviderHashMap.get("x");
+            if (!(provider instanceof XProvider)) {
+                Log.e(SocialLoginPlugin.LOG_TAG, "Provider is not an X provider (could be null)");
+                return;
+            }
+            ((XProvider) provider).handleIntent(intent);
+        } catch (Throwable t) {
+            Log.e(SocialLoginPlugin.LOG_TAG, "Cannot handle X login intent");
+        }
+    }
 
     @Override
     protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
@@ -285,5 +298,18 @@ public class SocialLoginPlugin extends Plugin {
 
         // Handle other providers' activity results if needed
         Log.d(LOG_TAG, "Activity result not handled by any provider");
+    }
+    
+    @Override
+    protected void handleOnResume() {
+        super.handleOnResume();
+        
+        Log.d(LOG_TAG, "SocialLoginPlugin.handleOnResume called");
+        
+        // Handle X provider resume (check for cancelled OAuth)
+        SocialProvider xProvider = socialProviderHashMap.get("x");
+        if (xProvider instanceof XProvider) {
+            ((XProvider) xProvider).onAppResume();
+        }
     }
 }

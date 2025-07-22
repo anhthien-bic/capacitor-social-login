@@ -1,271 +1,253 @@
-# X (Twitter) Provider Setup
+# X Provider MainActivity Setup
 
-This guide will help you set up X (Twitter) authentication using the PKCE OAuth 2.0 flow.
+## Vấn đề
+Custom Tabs không tự động đóng và gửi result về app. Chúng ta cần setup MainActivity để handle callback URL từ Custom Tabs.
 
-## Prerequisites
+## Setup MainActivity.java
 
-1. An X Developer Account
-2. A registered X App in the X Developer Portal
-3. Capacitor project with this plugin installed
+### 1. Cập nhật MainActivity.java
 
-## X Developer Portal Setup
+Mở file `android/app/src/main/java/com/your/package/MainActivity.java` và cập nhật như sau:
 
-### 1. Create a New App
+```java
+package com.your.package; // Thay bằng package name của bạn
 
-1. Go to the [X Developer Portal](https://developer.x.com/)
-2. Sign in with your X account
-3. Click "Create App" or "New App"
-4. Fill in the required information:
-   - App name
-   - App description
-   - Website URL
-   - Callback URLs (see below)
+import com.getcapacitor.BridgeActivity;
+import android.content.Intent;
+import android.util.Log;
 
-### 2. Configure OAuth 2.0 Settings
+public class MainActivity extends BridgeActivity {
 
-1. In your app settings, go to "User authentication settings"
-2. Enable "OAuth 2.0"
-3. Set the following:
-   - **App type**: Choose "Native App" for mobile apps
-   - **Callback URLs**: Add your redirect URLs:
-     - For development: `your-app-scheme://oauth/callback`
-     - For production: `your-app-scheme://oauth/callback`
-   - **Website URL**: Your app's website URL
-   - **Client type**: Public
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        
+        // Handle OAuth callback khi app được mở từ Custom Tab
+        Intent intent = getIntent();
+        if (intent != null && intent.getData() != null) {
+            String url = intent.getData().toString();
+            if (url.startsWith("your-app-scheme://oauth/callback")) {
+                // Handle X OAuth callback
+                handleXOAuthCallback(intent);
+            }
+        }
+    }
 
-### 3. Get Your Credentials
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        
+        // Handle OAuth callback từ Custom Tab khi app đang chạy
+        if (intent != null && intent.getData() != null) {
+            String url = intent.getData().toString();
+            if (url.startsWith("your-app-scheme://oauth/callback")) {
+                handleXOAuthCallback(intent);
+            }
+        }
+    }
+    
+    private void handleXOAuthCallback(Intent intent) {
+        try {
+            // Lấy SocialLoginPlugin instance
+            com.getcapacitor.PluginHandle pluginHandle = getBridge().getPlugin("SocialLogin");
+            if (pluginHandle == null) {
+                Log.e("X OAuth", "SocialLogin plugin handle is null");
+                return;
+            }
+            
+            com.getcapacitor.Plugin plugin = pluginHandle.getInstance();
+            if (!(plugin instanceof ee.forgr.capacitor.social.login.SocialLoginPlugin)) {
+                Log.e("X OAuth", "SocialLogin plugin instance is not SocialLoginPlugin");
+                return;
+            }
+            
+            // Delegate callback handling cho XProvider
+            ((ee.forgr.capacitor.social.login.SocialLoginPlugin) plugin).handleXLoginIntent(intent);
+            
+        } catch (Exception e) {
+            Log.e("X OAuth", "Error handling X OAuth callback", e);
+        }
+    }
+}
+```
 
-1. Go to "Keys and tokens" section
-2. Copy your **Client ID** (you'll need this for configuration)
-3. Note: For PKCE flow, you don't need a Client Secret
+### 2. Thay đổi cần thiết
 
-## Plugin Configuration
+1. **Thay `your-app-scheme`** bằng scheme thực tế của app bạn
+   - Ví dụ: `myapp://oauth/callback`
+   - Hoặc: `com.yourcompany.yourapp://oauth/callback`
 
-### 1. Initialize the Plugin
+2. **Thay `com.your.package`** bằng package name thực tế của app bạn
+
+### 3. Ví dụ hoàn chỉnh
+
+```java
+package com.example.myapp;
+
+import com.getcapacitor.BridgeActivity;
+import android.content.Intent;
+import android.util.Log;
+
+public class MainActivity extends BridgeActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        
+        // Handle OAuth callback khi app được mở từ Custom Tab
+        Intent intent = getIntent();
+        if (intent != null && intent.getData() != null) {
+            String url = intent.getData().toString();
+            if (url.startsWith("myapp://oauth/callback")) {
+                handleXOAuthCallback(intent);
+            }
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        
+        // Handle OAuth callback từ Custom Tab khi app đang chạy
+        if (intent != null && intent.getData() != null) {
+            String url = intent.getData().toString();
+            if (url.startsWith("myapp://oauth/callback")) {
+                handleXOAuthCallback(intent);
+            }
+        }
+    }
+    
+    private void handleXOAuthCallback(Intent intent) {
+        try {
+            com.getcapacitor.PluginHandle pluginHandle = getBridge().getPlugin("SocialLogin");
+            if (pluginHandle == null) {
+                Log.e("X OAuth", "SocialLogin plugin handle is null");
+                return;
+            }
+            
+            com.getcapacitor.Plugin plugin = pluginHandle.getInstance();
+            if (!(plugin instanceof ee.forgr.capacitor.social.login.SocialLoginPlugin)) {
+                Log.e("X OAuth", "SocialLogin plugin instance is not SocialLoginPlugin");
+                return;
+            }
+            
+            ((ee.forgr.capacitor.social.login.SocialLoginPlugin) plugin).handleXLoginIntent(intent);
+            
+        } catch (Exception e) {
+            Log.e("X OAuth", "Error handling X OAuth callback", e);
+        }
+    }
+}
+```
+
+## Bước 2: Cập nhật AndroidManifest.xml
+
+Đảm bảo MainActivity có intent filter cho callback URL:
+
+```xml
+<activity
+    android:name=".MainActivity"
+    android:exported="true"
+    android:launchMode="singleTask">
+    
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+    </intent-filter>
+    
+    <!-- Intent filter cho X OAuth callback -->
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="myapp" /> <!-- Thay bằng scheme của bạn -->
+    </intent-filter>
+</activity>
+```
+
+## Bước 3: Cấu hình Plugin
+
+Trong app của bạn, cấu hình X provider với redirect URL khớp với scheme:
 
 ```typescript
-import { SocialLogin } from '@capacitor-community/social-login';
-
 await SocialLogin.initialize({
   x: {
     clientId: 'your-x-client-id',
-    redirectUrl: 'your-app-scheme://oauth/callback'
+    redirectUrl: 'myapp://oauth/callback' // Khớp với scheme trong AndroidManifest.xml
   }
 });
 ```
 
-### 2. Login with X
+## Bước 4: Cấu hình X Developer Portal
+
+Trong X Developer Portal, set callback URL là:
+```
+myapp://oauth/callback
+```
+
+## Flow hoạt động
+
+1. **User click login** → Mở Custom Tab với X OAuth URL
+2. **User đăng nhập** → User đăng nhập trên X
+3. **X redirect** → X redirect về `myapp://oauth/callback?code=xxx&state=xxx`
+4. **Android system** → Nhận intent và mở app
+5. **MainActivity.onCreate/onNewIntent** → Handle callback URL
+6. **SocialLoginPlugin.handleXLoginIntent** → Delegate cho XProvider
+7. **XProvider.handleIntent** → Parse code và trả về result
+8. **Custom Tab tự đóng** → User quay về app với result
+
+## Testing
+
+### 1. Test callback handling
 
 ```typescript
+// Test login flow
 const result = await SocialLogin.login({
   provider: 'x',
-  options: {
-    scopes: ['tweet.read', 'users.read', 'offline.access'],
-    state: 'optional-custom-state'
-  }
+  options: { scopes: ['tweet.read', 'users.read'] }
 });
 
-console.log('Login result:', result);
-// {
-//   provider: 'x',
-//   result: {
-//     accessToken: {
-//       token: 'access-token-here',
-//       refreshToken: 'refresh-token-here'
-//     },
-//     profile: {
-//       id: 'user-id',
-//       username: 'username',
-//       name: 'Display Name',
-//       email: 'user@example.com',
-//       profileImageUrl: 'https://...',
-//       verified: true
-//     }
-//   }
-// }
+console.log('X login result:', result);
 ```
 
-### 3. Check Login Status
+### 2. Debug logging
 
-```typescript
-const status = await SocialLogin.isLoggedIn({
-  provider: 'x'
-});
+Thêm logging để debug:
 
-console.log('Is logged in:', status.isLoggedIn);
+```java
+Log.d("MainActivity", "Intent received: " + intent.getData());
+Log.d("X OAuth", "Callback URL: " + url);
 ```
-
-### 4. Get Authorization Code
-
-```typescript
-const authCode = await SocialLogin.getAuthorizationCode({
-  provider: 'x'
-});
-
-console.log('Access token:', authCode.accessToken);
-```
-
-### 5. Logout
-
-```typescript
-await SocialLogin.logout({
-  provider: 'x'
-});
-```
-
-## Platform-Specific Setup
-
-### Android
-
-1. **Add URL Scheme**: Add your redirect URL scheme to your Android app's manifest or configuration.
-
-2. **Network Security**: Ensure your app can make HTTPS requests to X APIs.
-
-### iOS
-
-1. **URL Scheme**: Add your redirect URL scheme to your iOS app's Info.plist:
-
-```xml
-<key>CFBundleURLTypes</key>
-<array>
-  <dict>
-    <key>CFBundleURLName</key>
-    <string>your-app-scheme</string>
-    <key>CFBundleURLSchemes</key>
-    <array>
-      <string>your-app-scheme</string>
-    </array>
-  </dict>
-</array>
-```
-
-2. **Associated Domains**: If using universal links, add associated domains.
-
-### Web
-
-1. **Redirect URL**: Ensure your redirect URL is properly configured in your web app.
-2. **CORS**: Make sure your web app can handle the OAuth callback.
-
-## Available Scopes
-
-The following scopes are available for X API access:
-
-- `tweet.read` - Read tweets and tweet data
-- `tweet.write` - Create and manage tweets
-- `users.read` - Read user profile information
-- `offline.access` - Get refresh tokens for long-term access
-- `follows.read` - Read follow relationships
-- `follows.write` - Manage follow relationships
-- `like.read` - Read like information
-- `like.write` - Manage likes
-- `dm.read` - Read direct messages
-- `dm.write` - Send direct messages
-- `block.read` - Read block information
-- `block.write` - Manage blocks
-- `mute.read` - Read mute information
-- `mute.write` - Manage mutes
-
-## Error Handling
-
-Common errors and solutions:
-
-1. **"X Client ID not set"**: Make sure you've initialized the plugin with the correct client ID.
-2. **"Invalid redirect URL"**: Ensure your redirect URL matches exactly what's configured in the X Developer Portal.
-3. **"OAuth error"**: Check your app configuration in the X Developer Portal.
-4. **"No authorization code received"**: The user may have cancelled the authentication flow.
-
-## Security Considerations
-
-1. **PKCE Flow**: This implementation uses PKCE (Proof Key for Code Exchange) which is secure for public clients.
-2. **Token Storage**: Tokens are stored securely using platform-specific secure storage.
-3. **HTTPS Only**: All API calls are made over HTTPS.
-4. **State Parameter**: The state parameter is used to prevent CSRF attacks.
 
 ## Troubleshooting
 
-1. **Authentication fails**: Check your client ID and redirect URL configuration.
-2. **Callback not working**: Verify your URL scheme is properly configured.
-3. **Token refresh issues**: Ensure you're requesting the `offline.access` scope for refresh tokens.
-4. **API rate limits**: Be aware of X API rate limits and implement appropriate error handling.
+### Custom Tab không đóng
 
-## Example Implementation
+- Kiểm tra intent filter trong AndroidManifest.xml
+- Đảm bảo scheme khớp với redirect URL
+- Kiểm tra MainActivity intent handling
 
-Here's a complete example of how to implement X authentication:
+### App không nhận được callback
 
-```typescript
-import { SocialLogin } from '@capacitor-community/social-login';
+- Kiểm tra package name và scheme
+- Đảm bảo plugin được initialize
+- Kiểm tra X Developer Portal callback URL
 
-class XAuthService {
-  async initialize() {
-    try {
-      await SocialLogin.initialize({
-        x: {
-          clientId: 'your-client-id',
-          redirectUrl: 'your-app://oauth/callback'
-        }
-      });
-      console.log('X provider initialized');
-    } catch (error) {
-      console.error('Failed to initialize X provider:', error);
-    }
-  }
+### App crash khi handle callback
 
-  async login() {
-    try {
-      const result = await SocialLogin.login({
-        provider: 'x',
-        options: {
-          scopes: ['tweet.read', 'users.read', 'offline.access']
-        }
-      });
-      
-      // Store user data
-      this.storeUserData(result.result);
-      return result;
-    } catch (error) {
-      console.error('X login failed:', error);
-      throw error;
-    }
-  }
+- Kiểm tra null checks
+- Đảm bảo plugin instance tồn tại
+- Kiểm tra URL format
 
-  async logout() {
-    try {
-      await SocialLogin.logout({ provider: 'x' });
-      this.clearUserData();
-    } catch (error) {
-      console.error('X logout failed:', error);
-    }
-  }
+## So sánh với Google Provider
 
-  async checkLoginStatus() {
-    try {
-      const status = await SocialLogin.isLoggedIn({ provider: 'x' });
-      return status.isLoggedIn;
-    } catch (error) {
-      console.error('Failed to check login status:', error);
-      return false;
-    }
-  }
+| Aspect | Google Provider | X Provider |
+|--------|----------------|------------|
+| **Intent Handling** | `onActivityResult` | `onNewIntent` |
+| **Callback URL** | Google scheme | Custom app scheme |
+| **Plugin Method** | `handleGoogleLoginIntent` | `handleXLoginIntent` |
+| **Setup Complexity** | Medium | Simple |
 
-  private storeUserData(result: any) {
-    // Store user data in your app's storage
-    localStorage.setItem('x_user', JSON.stringify(result));
-  }
-
-  private clearUserData() {
-    localStorage.removeItem('x_user');
-  }
-}
-
-// Usage
-const xAuth = new XAuthService();
-await xAuth.initialize();
-
-// Login
-const user = await xAuth.login();
-console.log('Logged in user:', user);
-
-// Check status
-const isLoggedIn = await xAuth.checkLoginStatus();
-console.log('Is logged in:', isLoggedIn);
-``` 
+X provider setup đơn giản hơn Google provider vì không cần handle activity result! 

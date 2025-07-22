@@ -6,12 +6,8 @@ import android.content.Intent;
 import android.net.Uri;
 import android.util.Base64;
 import android.util.Log;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.TextView;
+import androidx.browser.customtabs.CustomTabsIntent;
+import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
@@ -33,6 +29,7 @@ public class XProvider implements SocialProvider {
     private static final String OAUTH_URL = "https://x.com/i/oauth2/authorize";
     private static final String TOKEN_URL = "https://api.x.com/2/oauth2/token";
     private static final String USER_PROFILE_URL = "https://api.x.com/2/users/me";
+    private static final int CUSTOM_TAB_REQUEST_CODE = 1001;
     
     private Activity activity;
     private Context context;
@@ -40,6 +37,8 @@ public class XProvider implements SocialProvider {
     private String redirectUrl;
     private String accessToken;
     private String refreshToken;
+    private PluginCall currentCall;
+    private boolean isHandlingOAuth = false; // Flag to prevent race condition
     
     public XProvider(Activity activity, Context context) {
         this.activity = activity;
@@ -49,7 +48,7 @@ public class XProvider implements SocialProvider {
     public void initialize(String clientId, String redirectUrl) {
         this.clientId = clientId;
         this.redirectUrl = redirectUrl;
-        loadStoredTokens();
+        // loadStoredTokens();
     }
     
     @Override
@@ -87,8 +86,7 @@ public class XProvider implements SocialProvider {
     
     @Override
     public void logout(PluginCall call) {
-        // Clear stored tokens
-        clearStoredTokens();
+        clearCodeVerifier();
         call.resolve();
     }
     
@@ -106,15 +104,11 @@ public class XProvider implements SocialProvider {
     
     @Override
     public void isLoggedIn(PluginCall call) {
-        if (accessToken == null || accessToken.isEmpty()) {
-            JSObject result = new JSObject();
-            result.put("isLoggedIn", false);
-            call.resolve(result);
-            return;
-        }
-        
-        // Check if token is still valid
-        checkTokenValidity(call);
+        // For X provider, we don't store tokens locally
+        // Backend should handle token validation
+        JSObject result = new JSObject();
+        result.put("isLoggedIn", false);
+        call.resolve(result);
     }
     
     @Override
@@ -156,52 +150,48 @@ public class XProvider implements SocialProvider {
     }
     
     private void showInAppBrowser(String authUrl, PluginCall call) {
+        this.currentCall = call;
+        
         activity.runOnUiThread(() -> {
-            // Create WebView for in-app browser
-            WebView webView = new WebView(context);
-            webView.getSettings().setJavaScriptEnabled(true);
-            
-            // Create progress bar
-            ProgressBar progressBar = new ProgressBar(context);
-            progressBar.setIndeterminate(true);
-            
-            // Create layout
-            LinearLayout layout = new LinearLayout(context);
-            layout.setOrientation(LinearLayout.VERTICAL);
-            layout.addView(progressBar);
-            layout.addView(webView);
-            
-            // Create dialog
-            android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(context);
-            builder.setTitle("Sign in with X");
-            builder.setView(layout);
-            builder.setCancelable(true);
-            
-            android.app.AlertDialog dialog = builder.create();
-            
-            webView.setWebViewClient(new WebViewClient() {
-                @Override
-                public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                    if (url.startsWith(redirectUrl)) {
-                        // Handle OAuth callback
-                        handleOAuthCallback(url, call, dialog);
-                        return true;
-                    }
-                    return false;
-                }
+            try {
+                // Create Custom Tabs Intent
+                CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
+                builder.setToolbarColor(ContextCompat.getColor(context, android.R.color.white));
+                builder.setShowTitle(true);
+                builder.setUrlBarHidingEnabled(false);
                 
-                @Override
-                public void onPageFinished(WebView view, String url) {
-                    progressBar.setVisibility(android.view.View.GONE);
-                }
-            });
-            
-            webView.loadUrl(authUrl);
-            dialog.show();
+                CustomTabsIntent customTabsIntent = builder.build();
+                customTabsIntent.intent.setData(Uri.parse(authUrl));
+                
+                // Launch Custom Tab
+                activity.startActivity(customTabsIntent.intent);
+                
+                // Set timeout to handle case when user closes tab manually
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                    if (currentCall != null) {
+                        Log.w(TAG, "OAuth timeout - user may have closed the tab manually");
+                        currentCall.reject("OAuth cancelled by user");
+                        currentCall = null;
+                        clearCodeVerifier();
+                    }
+                }, 300000); // 5 minutes timeout
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Error launching Custom Tab", e);
+                call.reject("Failed to launch browser: " + e.getMessage());
+                currentCall = null;
+            }
         });
     }
     
-    private void handleOAuthCallback(String url, PluginCall call, android.app.AlertDialog dialog) {
+    private void handleOAuthCallback(String url) {
+        if (currentCall == null || isHandlingOAuth) {
+            Log.e(TAG, "No current call available or already handling OAuth");
+            return;
+        }
+        
+        isHandlingOAuth = true;
+        
         Uri uri = Uri.parse(url);
         String code = uri.getQueryParameter("code");
         String state = uri.getQueryParameter("state");
@@ -209,183 +199,74 @@ public class XProvider implements SocialProvider {
         
         if (error != null) {
             Log.e(TAG, "OAuth error: " + error);
-            dialog.dismiss();
-            call.reject("OAuth error: " + error);
+            currentCall.reject("OAuth error: " + error);
+            currentCall = null;
+            isHandlingOAuth = false;
             return;
         }
         
         if (code != null && state != null) {
-            // Exchange code for token
-            exchangeCodeForToken(code, call, dialog);
+            // Return code and code_verifier for backend to exchange
+            String codeVerifier = getStoredCodeVerifier();
+            if (codeVerifier == null) {
+                currentCall.reject("No code verifier found");
+                currentCall = null;
+                isHandlingOAuth = false;
+                return;
+            }
+            
+            // Clear code verifier
+            clearCodeVerifier();
+            
+            // Return result
+            JSObject result = new JSObject();
+            result.put("provider", "x");
+            
+            JSObject resultData = new JSObject();
+            resultData.put("token", code);
+            resultData.put("code_verifier", codeVerifier);
+            
+            result.put("result", resultData);
+            
+            currentCall.resolve(result);
+            currentCall = null;
+            isHandlingOAuth = false;
         } else {
-            dialog.dismiss();
-            call.reject("Invalid OAuth callback");
+            currentCall.reject("Invalid OAuth callback");
+            currentCall = null;
+            isHandlingOAuth = false;
         }
     }
     
-    private void exchangeCodeForToken(String code, PluginCall call, android.app.AlertDialog dialog) {
-        new Thread(() -> {
-            try {
-                String codeVerifier = getStoredCodeVerifier();
-                if (codeVerifier == null) {
-                    throw new Exception("No code verifier found");
-                }
-                
-                // Build token request
-                String postData = "grant_type=authorization_code" +
-                        "&client_id=" + URLEncoder.encode(clientId, "UTF-8") +
-                        "&code_verifier=" + URLEncoder.encode(codeVerifier, "UTF-8") +
-                        "&code=" + URLEncoder.encode(code, "UTF-8") +
-                        "&redirect_uri=" + URLEncoder.encode(redirectUrl, "UTF-8");
-                
-                // Make token request
-                java.net.URL url = new java.net.URL(TOKEN_URL);
-                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("POST");
-                connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-                connection.setDoOutput(true);
-                
-                try (java.io.OutputStream os = connection.getOutputStream()) {
-                    byte[] input = postData.getBytes(StandardCharsets.UTF_8);
-                    os.write(input, 0, input.length);
-                }
-                
-                int responseCode = connection.getResponseCode();
-                if (responseCode == 200) {
-                    // Read response
-                    java.io.BufferedReader reader = new java.io.BufferedReader(
-                            new java.io.InputStreamReader(connection.getInputStream()));
-                    StringBuilder response = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        response.append(line);
-                    }
-                    reader.close();
-                    
-                    // Parse token response
-                    JSONObject tokenResponse = new JSONObject(response.toString());
-                    String accessToken = tokenResponse.getString("access_token");
-                    String refreshToken = tokenResponse.optString("refresh_token", null);
-                    
-                    // Get user profile
-                    getUserProfile(accessToken, refreshToken, call, dialog);
-                    
-                } else {
-                    throw new Exception("Token request failed with code: " + responseCode);
-                }
-                
-            } catch (Exception e) {
-                Log.e(TAG, "Error exchanging code for token", e);
-                activity.runOnUiThread(() -> {
-                    dialog.dismiss();
-                    call.reject("Failed to exchange code for token: " + e.getMessage());
-                });
+    public boolean handleIntent(Intent intent) {
+        if (intent != null && intent.getData() != null) {
+            String url = intent.getData().toString();
+            if (url.startsWith(redirectUrl)) {
+                handleOAuthCallback(url);
+                return true;
             }
-        }).start();
+        }
+        return false;
     }
     
-    private void getUserProfile(String accessToken, String refreshToken, PluginCall call, android.app.AlertDialog dialog) {
-        try {
-            java.net.URL url = new java.net.URL(USER_PROFILE_URL);
-            java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("Authorization", "Bearer " + accessToken);
-            
-            int responseCode = connection.getResponseCode();
-            if (responseCode == 200) {
-                // Read response
-                java.io.BufferedReader reader = new java.io.BufferedReader(
-                        new java.io.InputStreamReader(connection.getInputStream()));
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    response.append(line);
-                }
-                reader.close();
-                
-                // Parse profile response
-                JSONObject profileResponse = new JSONObject(response.toString());
-                JSONObject profile = profileResponse.getJSONObject("data");
-                
-                // Store tokens
-                this.accessToken = accessToken;
-                this.refreshToken = refreshToken;
-                storeTokens(accessToken, refreshToken);
-                
-                // Clear code verifier
+    /**
+     * Handle app resume - check if OAuth was cancelled by user
+     */
+    public void onAppResume() {
+        // If we have a current call but no redirect happened, user probably cancelled
+        if (currentCall != null && !isHandlingOAuth) {
+            // Check if we have a stored code verifier (meaning OAuth was started)
+            String codeVerifier = getStoredCodeVerifier();
+            if (codeVerifier != null) {
+                // User probably closed the tab manually, clear everything
+                Log.w(TAG, "App resumed with pending OAuth call - user may have cancelled");
+                currentCall.reject("OAuth cancelled by user");
+                currentCall = null;
                 clearCodeVerifier();
-                
-                // Return result
-                JSObject result = new JSObject();
-                result.put("provider", "x");
-                
-                JSObject resultData = new JSObject();
-                JSObject accessTokenObj = new JSObject();
-                accessTokenObj.put("token", accessToken);
-                if (refreshToken != null) {
-                    accessTokenObj.put("refreshToken", refreshToken);
-                }
-                resultData.put("accessToken", accessTokenObj);
-                
-                JSObject profileObj = new JSObject();
-                profileObj.put("id", profile.optString("id", null));
-                profileObj.put("username", profile.optString("username", null));
-                profileObj.put("name", profile.optString("name", null));
-                profileObj.put("email", profile.optString("email", null));
-                profileObj.put("profileImageUrl", profile.optString("profile_image_url", null));
-                profileObj.put("verified", profile.optBoolean("verified", false));
-                
-                resultData.put("profile", profileObj);
-                result.put("result", resultData);
-                
-                activity.runOnUiThread(() -> {
-                    dialog.dismiss();
-                    call.resolve(result);
-                });
-                
-            } else {
-                throw new Exception("Profile request failed with code: " + responseCode);
             }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting user profile", e);
-            activity.runOnUiThread(() -> {
-                dialog.dismiss();
-                call.reject("Failed to get user profile: " + e.getMessage());
-            });
         }
     }
-    
-    private void checkTokenValidity(PluginCall call) {
-        new Thread(() -> {
-            try {
-                java.net.URL url = new java.net.URL(USER_PROFILE_URL);
-                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setRequestProperty("Authorization", "Bearer " + accessToken);
-                
-                int responseCode = connection.getResponseCode();
-                JSObject result = new JSObject();
-                
-                if (responseCode == 200) {
-                    result.put("isLoggedIn", true);
-                } else {
-                    clearStoredTokens();
-                    result.put("isLoggedIn", false);
-                }
-                
-                call.resolve(result);
-                
-            } catch (Exception e) {
-                Log.e(TAG, "Error checking token validity", e);
-                clearStoredTokens();
-                JSObject result = new JSObject();
-                result.put("isLoggedIn", false);
-                call.resolve(result);
-            }
-        }).start();
-    }
-    
+
     private void storeCodeVerifier(String codeVerifier) {
         android.content.SharedPreferences prefs = context.getSharedPreferences("XProvider", Context.MODE_PRIVATE);
         prefs.edit().putString("code_verifier", codeVerifier).apply();
@@ -400,31 +281,4 @@ public class XProvider implements SocialProvider {
         android.content.SharedPreferences prefs = context.getSharedPreferences("XProvider", Context.MODE_PRIVATE);
         prefs.edit().remove("code_verifier").apply();
     }
-    
-    private void storeTokens(String accessToken, String refreshToken) {
-        android.content.SharedPreferences prefs = context.getSharedPreferences("XProvider", Context.MODE_PRIVATE);
-        android.content.SharedPreferences.Editor editor = prefs.edit();
-        editor.putString("access_token", accessToken);
-        if (refreshToken != null) {
-            editor.putString("refresh_token", refreshToken);
-        }
-        editor.apply();
-    }
-    
-    private void clearStoredTokens() {
-        android.content.SharedPreferences prefs = context.getSharedPreferences("XProvider", Context.MODE_PRIVATE);
-        android.content.SharedPreferences.Editor editor = prefs.edit();
-        editor.remove("access_token");
-        editor.remove("refresh_token");
-        editor.apply();
-        
-        this.accessToken = null;
-        this.refreshToken = null;
-    }
-    
-    private void loadStoredTokens() {
-        android.content.SharedPreferences prefs = context.getSharedPreferences("XProvider", Context.MODE_PRIVATE);
-        this.accessToken = prefs.getString("access_token", null);
-        this.refreshToken = prefs.getString("refresh_token", null);
-    }
-} 
+}
