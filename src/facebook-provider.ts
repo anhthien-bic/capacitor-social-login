@@ -25,7 +25,7 @@ export class FacebookSocialLogin extends BaseSocialLogin {
         appId: this.appId,
         version: 'v17.0',
         xfbml: true,
-        cookie: true,
+        cookie: false,
       });
     }
   }
