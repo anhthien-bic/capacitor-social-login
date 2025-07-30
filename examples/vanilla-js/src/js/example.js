@@ -56,3 +56,25 @@ window.getProfile = async () => {
     alert('Failed to get profile: ' + error.message);
   }
 };
+
+// Example of using forcePrompt to always show account selection
+async function loginWithForcePrompt() {
+  try {
+    const result = await SocialLogin.login({
+      provider: 'google',
+      options: {
+        forcePrompt: true, // Always show account selection prompt
+        scopes: ['email', 'profile'],
+      },
+    });
+
+    console.log('Login with force prompt successful:', result);
+    document.getElementById('result').textContent = JSON.stringify(result, null, 2);
+  } catch (error) {
+    console.error('Login with force prompt failed:', error);
+    document.getElementById('result').textContent = `Error: ${error.message}`;
+  }
+}
+
+// Add button for force prompt login
+document.getElementById('loginWithForcePrompt').addEventListener('click', loginWithForcePrompt);

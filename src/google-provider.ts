@@ -320,6 +320,7 @@ export class GoogleSocialLogin extends BaseSocialLogin {
       ...(nonce && { nonce }),
       include_granted_scopes: 'true',
       state: 'popup',
+      prompt: 'select_account', // Always show account selection prompt
     });
     if (hostedDomain !== undefined) {
       params.append('hd', hostedDomain);
