@@ -35,7 +35,7 @@ public class XProvider: NSObject {
         storeCodeVerifier(codeVerifier)
         
         // Build OAuth URL
-        let scopes = payload["scopes"] as? String ?? "tweet.read users.read offline.access"
+        let scopes = payload["scopes"] as? String ?? "tweet.read users.read users.email"
         let authUrl = buildAuthUrl(codeChallenge: codeChallenge, state: state, scopes: scopes)
         
         // Start authentication session

@@ -64,7 +64,7 @@ public class XProvider implements SocialProvider {
             storeCodeVerifier(codeVerifier);
             
             // Build OAuth URL
-            String scopes = "tweet.read users.read offline.access";
+            String scopes = "tweet.read users.read users.email";
             if (config.has("scopes")) {
                 scopes = config.getString("scopes");
             }

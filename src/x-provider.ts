@@ -19,7 +19,7 @@ export class XSocialLogin extends BaseSocialLogin {
       throw new Error('X Client ID not set. Call initialize() first.');
     }
 
-    let scopes = options.scopes || ['users.email', 'users.read'];
+    let scopes = options.scopes || ['tweet.read', 'users.email', 'users.read'];
 
     if (scopes.length === 0) {
         scopes = ['users.email', 'users.read'];
