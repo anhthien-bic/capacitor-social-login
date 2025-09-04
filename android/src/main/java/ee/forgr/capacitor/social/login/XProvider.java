@@ -13,11 +13,14 @@ import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
 import ee.forgr.capacitor.social.login.helpers.SocialProvider;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -66,7 +69,19 @@ public class XProvider implements SocialProvider {
             // Build OAuth URL
             String scopes = "tweet.read users.read users.email";
             if (config.has("scopes")) {
-                scopes = config.getString("scopes");
+                try {
+                    JSONArray scopesArray = config.getJSONArray("scopes");
+                    if (scopesArray != null && scopesArray.length() > 0) {
+                        List<String> scopesList = new ArrayList<>();
+                        for (int i = 0; i < scopesArray.length(); i++) {
+                            scopesList.add(scopesArray.getString(i));
+                        }
+                        scopes = String.join(" ", scopesList);
+                    }
+                } catch (Exception e) {
+                    // Fallback to string if array parsing fails
+                    scopes = config.getString("scopes");
+                }
             }
             
             String authUrl = buildAuthUrl(codeChallenge, state, scopes);
