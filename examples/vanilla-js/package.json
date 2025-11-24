@@ -16,7 +16,7 @@
     "@capacitor/core": "^7.0.0",
     "@capacitor/camera": "^7.0.0",
     "@capacitor/splash-screen": "^7.0.0",
-    "@capgo/capacitor-social-login": "file:../../",
+    "@thienna/capacitor-social-login": "file:../../",
     "@capacitor/ios": "^7.0.0",
     "@capacitor/android": "^7.0.0"
   },

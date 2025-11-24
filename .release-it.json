@@ -1,0 +1,17 @@
+{
+  "git": {
+    "commitMessage": "chore: release v${version}",
+    "tagName": "v${version}",
+    "push": true,
+    "requireCleanWorkingDir": true,
+    "pushRepo": "thienna",
+    "requireBranch": "bic"
+  },
+  "github": {
+    "release": true,
+    "releaseNotes": true
+  },
+  "npm": {
+    "publish": true
+  }
+}

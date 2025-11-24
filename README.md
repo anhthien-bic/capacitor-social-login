@@ -18,10 +18,20 @@ This plugin implement social auth for:
 - Google (with credential manager)
 - Apple (with 0auth on android)
 - Facebook ( with latest SDK)
+- X (Twitter) (with OAuth 2.0)
 
 We plan in the future to keep adding others social login and make this plugin the all in one solution.
 
 This plugin is the only one who implement all 3 majors social login on WEB, IOS and Android
+
+## Features
+
+- **Multi-platform support**: iOS, Android, and Web
+- **Multiple providers**: Google, Apple, Facebook, and X (Twitter)
+- **Force prompt**: Always show account selection prompt with `forcePrompt: true`
+- **Offline mode**: Support for Google offline authentication
+- **TypeScript support**: Full TypeScript definitions
+- **Credential management**: Automatic token refresh and management
 
 ## Documentation
 
@@ -35,6 +45,106 @@ https://capgo.app/docs/plugins/social-login/getting-started/
 ```bash
 npm install @capgo/capacitor-social-login
 npx cap sync
+```
+
+## Usage
+
+### Basic Usage
+
+```typescript
+import { SocialLogin } from '@capgo/capacitor-social-login';
+
+// Initialize the plugin
+await SocialLogin.initialize({
+  google: {
+    iOSClientId: 'your-ios-client-id',
+    webClientId: 'your-web-client-id',
+  },
+  apple: {
+    clientId: 'your-apple-client-id',
+  },
+  facebook: {
+    appId: 'your-facebook-app-id',
+  },
+  x: {
+    clientId: 'your-x-client-id',
+    redirectUrl: 'your-redirect-url',
+  },
+});
+
+// Login with Google
+const googleResult = await SocialLogin.login({
+  provider: 'google',
+  options: {
+    scopes: ['email', 'profile'],
+  },
+});
+
+// Login with Apple
+const appleResult = await SocialLogin.login({
+  provider: 'apple',
+  options: {
+    scopes: ['name', 'email'],
+  },
+});
+
+// Login with Facebook
+const facebookResult = await SocialLogin.login({
+  provider: 'facebook',
+  options: {
+    permissions: ['email', 'public_profile'],
+  },
+});
+
+// Login with X (Twitter)
+const xResult = await SocialLogin.login({
+  provider: 'x',
+  options: {
+    scopes: ['tweet.read', 'users.read'],
+  },
+});
+```
+
+### Force Account Selection
+
+Để luôn hiển thị prompt chọn account (ngay cả khi chỉ có 1 account), sử dụng `forcePrompt: true`:
+
+```typescript
+// Luôn hiển thị prompt chọn account cho Google
+const result = await SocialLogin.login({
+  provider: 'google',
+  options: {
+    forcePrompt: true, // Luôn hiển thị prompt chọn account
+    scopes: ['email', 'profile'],
+  },
+});
+
+// Luôn hiển thị prompt chọn account cho Apple
+const result = await SocialLogin.login({
+  provider: 'apple',
+  options: {
+    forcePrompt: true, // Luôn hiển thị prompt chọn account
+    scopes: ['name', 'email'],
+  },
+});
+
+// Luôn hiển thị prompt chọn account cho Facebook
+const result = await SocialLogin.login({
+  provider: 'facebook',
+  options: {
+    forcePrompt: true, // Luôn hiển thị prompt chọn account
+    permissions: ['email', 'public_profile'],
+  },
+});
+
+// Luôn hiển thị prompt chọn account cho X
+const result = await SocialLogin.login({
+  provider: 'x',
+  options: {
+    forcePrompt: true, // Luôn hiển thị prompt chọn account
+    scopes: ['tweet.read', 'users.read'],
+  },
+});
 ```
 
 ## Apple
@@ -371,14 +481,14 @@ Initialize the plugin
 ### login(...)
 
 ```typescript
-login<T extends "apple" | "google" | "facebook">(options: Extract<LoginOptions, { provider: T; }>) => Promise<{ provider: T; result: ProviderResponseMap[T]; }>
+login<T extends "apple" | "google" | "facebook" | "x">(options: Extract<LoginOptions, { provider: T; }>) => Promise<{ provider: T; result: ProviderResponseMap[T]; }>
 ```
 
 Login with the selected provider
 
-| Param         | Type                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`options`** | <code><a href="#extract">Extract</a>&lt;{ provider: 'facebook'; options: <a href="#facebookloginoptions">FacebookLoginOptions</a>; }, { provider: T; }&gt; \| <a href="#extract">Extract</a>&lt;{ provider: 'google'; options: <a href="#googleloginoptions">GoogleLoginOptions</a>; }, { provider: T; }&gt; \| <a href="#extract">Extract</a>&lt;{ provider: 'apple'; options: <a href="#appleprovideroptions">AppleProviderOptions</a>; }, { provider: T; }&gt;</code> |
+| Param         | Type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code><a href="#extract">Extract</a>&lt;{ provider: 'facebook'; options: <a href="#facebookloginoptions">FacebookLoginOptions</a>; }, { provider: T; }&gt; \| <a href="#extract">Extract</a>&lt;{ provider: 'google'; options: <a href="#googleloginoptions">GoogleLoginOptions</a>; }, { provider: T; }&gt; \| <a href="#extract">Extract</a>&lt;{ provider: 'apple'; options: <a href="#appleprovideroptions">AppleProviderOptions</a>; }, { provider: T; }&gt; \| <a href="#extract">Extract</a>&lt;{ provider: 'x'; options: <a href="#xloginoptions">XLoginOptions</a>; }, { provider: T; }&gt;</code> |
 
 **Returns:** <code>Promise&lt;{ provider: T; result: ProviderResponseMap[T]; }&gt;</code>
 
@@ -388,14 +498,14 @@ Login with the selected provider
 ### logout(...)
 
 ```typescript
-logout(options: { provider: 'apple' | 'google' | 'facebook'; }) => Promise<void>
+logout(options: { provider: 'apple' | 'google' | 'facebook' | 'x'; }) => Promise<void>
 ```
 
 Logout
 
-| Param         | Type                                                          |
-| ------------- | ------------------------------------------------------------- |
-| **`options`** | <code>{ provider: 'apple' \| 'google' \| 'facebook'; }</code> |
+| Param         | Type                                                                 |
+| ------------- | -------------------------------------------------------------------- |
+| **`options`** | <code>{ provider: 'apple' \| 'google' \| 'facebook' \| 'x'; }</code> |
 
 --------------------
 
@@ -476,6 +586,7 @@ Execute provider-specific calls
 | **`facebook`** | <code>{ appId: string; clientToken?: string; }</code>                                                                                                               |
 | **`google`**   | <code>{ iOSClientId?: string; iOSServerClientId?: string; webClientId?: string; mode?: 'online' \| 'offline'; hostedDomain?: string; redirectUrl?: string; }</code> |
 | **`apple`**    | <code>{ clientId?: string; redirectUrl?: string; }</code>                                                                                                           |
+| **`x`**        | <code>{ clientId: string; redirectUrl: string; }</code>                                                                                                             |
 
 
 #### FacebookLoginResponse
@@ -529,6 +640,14 @@ Execute provider-specific calls
 | **`profile`**     | <code>{ user: string; email: string \| null; givenName: string \| null; familyName: string \| null; }</code> |
 
 
+#### XLoginResponse
+
+| Prop                | Type                |
+| ------------------- | ------------------- |
+| **`token`**         | <code>string</code> |
+| **`code_verifier`** | <code>string</code> |
+
+
 #### FacebookLoginOptions
 
 | Prop               | Type                  | Description      | Default            |
@@ -558,11 +677,19 @@ Execute provider-specific calls
 | **`state`**  | <code>string</code>   | State       |
 
 
+#### XLoginOptions
+
+| Prop         | Type                  | Description                                                                                     |
+| ------------ | --------------------- | ----------------------------------------------------------------------------------------------- |
+| **`scopes`** | <code>string[]</code> | Specifies the scopes required for accessing X APIs The default is defined in the configuration. |
+| **`state`**  | <code>string</code>   | State parameter for CSRF protection                                                             |
+
+
 #### isLoggedInOptions
 
-| Prop           | Type                                           | Description |
-| -------------- | ---------------------------------------------- | ----------- |
-| **`provider`** | <code>'apple' \| 'google' \| 'facebook'</code> | Provider    |
+| Prop           | Type                                                  | Description |
+| -------------- | ----------------------------------------------------- | ----------- |
+| **`provider`** | <code>'apple' \| 'google' \| 'facebook' \| 'x'</code> | Provider    |
 
 
 #### AuthorizationCode
@@ -575,9 +702,9 @@ Execute provider-specific calls
 
 #### AuthorizationCodeOptions
 
-| Prop           | Type                                           | Description |
-| -------------- | ---------------------------------------------- | ----------- |
-| **`provider`** | <code>'apple' \| 'google' \| 'facebook'</code> | Provider    |
+| Prop           | Type                                                  | Description |
+| -------------- | ----------------------------------------------------- | ----------- |
+| **`provider`** | <code>'apple' \| 'google' \| 'facebook' \| 'x'</code> | Provider    |
 
 
 #### FacebookGetProfileResponse
@@ -606,7 +733,7 @@ Execute provider-specific calls
 
 #### ProviderResponseMap
 
-<code>{ facebook: <a href="#facebookloginresponse">FacebookLoginResponse</a>; google: <a href="#googleloginresponse">GoogleLoginResponse</a>; apple: <a href="#appleproviderresponse">AppleProviderResponse</a>; }</code>
+<code>{ facebook: <a href="#facebookloginresponse">FacebookLoginResponse</a>; google: <a href="#googleloginresponse">GoogleLoginResponse</a>; apple: <a href="#appleproviderresponse">AppleProviderResponse</a>; x: <a href="#xloginresponse">XLoginResponse</a>; }</code>
 
 
 #### GoogleLoginResponse
@@ -616,7 +743,7 @@ Execute provider-specific calls
 
 #### LoginOptions
 
-<code>{ provider: 'facebook'; options: <a href="#facebookloginoptions">FacebookLoginOptions</a>; } | { provider: 'google'; options: <a href="#googleloginoptions">GoogleLoginOptions</a>; } | { provider: 'apple'; options: <a href="#appleprovideroptions">AppleProviderOptions</a>; }</code>
+<code>{ provider: 'facebook'; options: <a href="#facebookloginoptions">FacebookLoginOptions</a>; } | { provider: 'google'; options: <a href="#googleloginoptions">GoogleLoginOptions</a>; } | { provider: 'apple'; options: <a href="#appleprovideroptions">AppleProviderOptions</a>; } | { provider: 'x'; options: <a href="#xloginoptions">XLoginOptions</a>; }</code>
 
 
 #### Extract

@@ -3,7 +3,7 @@ require 'json'
 package = JSON.parse(File.read(File.join(__dir__, 'package.json')))
 
 Pod::Spec.new do |s|
-  s.name = 'CapgoCapacitorSocialLogin'
+  s.name = 'ThiennaCapacitorSocialLogin'
   s.version = package['version']
   s.summary = package['description']
   s.license = package['license']
@@ -14,8 +14,8 @@ Pod::Spec.new do |s|
   s.exclude_files = '**/node_modules/**/*', '**/examples/**/*'
   s.ios.deployment_target = '14.0'
   s.dependency 'Capacitor'
-  s.dependency 'FBSDKCoreKit', '17.4.0'
-  s.dependency 'FBSDKLoginKit', '17.4.0'
+  s.dependency 'FBSDKCoreKit', '16.3.1' # https://github.com/Cap-go/capacitor-social-login/issues/114
+  s.dependency 'FBSDKLoginKit', '16.3.1' # https://github.com/facebook/facebook-ios-sdk/issues/2384#issuecomment-2080038284
   s.dependency 'GoogleSignIn', '~> 9.0.0'
   s.dependency 'Alamofire', '~> 5.10.2'
   s.swift_version = '5.1'
